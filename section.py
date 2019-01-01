@@ -82,20 +82,67 @@ def FindConcrete(l_rows):
         j=0
         while l_rows[i+j]!="10":
             j=j+1        
-        xv.append(float(l_rows[i+j+1]))
+        xv.append(round(float(l_rows[i+j+1]),3))
     
     yv=[]     
     for i in pos_v:
         j=0
         while l_rows[i+j]!="20":
             j=j+1        
-        yv.append(float(l_rows[i+j+1]))
+        yv.append(round(float(l_rows[i+j+1]),3))
     
-    # calculate area of concrete section
-    def PolyArea(x,y):
-        return (0.5*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1))))
+    # define list of vertex coordiantes
+    pts=[]
+    for i in range(len(xv)):
+        pts.append([xv[i],yv[i]])
     
-    area= PolyArea(xv,yv)
+    # calculate area of concrete cross section
+    def area(pts):
+        if pts[0] != pts[-1]:
+            pts = pts + pts[:1]
+        x = [ c[0] for c in pts ]
+        y = [ c[1] for c in pts ]
+        s = 0
+        for i in range(len(pts) - 1):
+            s += x[i]*y[i+1] - x[i+1]*y[i]
+        return s/2
+    
+    # calculate position of centroid of concrete cross section
+    def centroid(pts):
+        if pts[0] != pts[-1]:
+            pts = pts + pts[:1]
+        x = [ c[0] for c in pts ]
+        y = [ c[1] for c in pts ]
+        sx = sy = 0
+        a = area(pts)
+        for i in range(len(pts) - 1):
+            sx += (x[i] + x[i+1])*(x[i]*y[i+1] - x[i+1]*y[i])
+            sy += (y[i] + y[i+1])*(x[i]*y[i+1] - x[i+1]*y[i])
+        return sx/(6*a), sy/(6*a)
+ 
+    # calculate inertia of concrete cross section
+    def inertia(pts): 
+        if pts[0] != pts[-1]:
+            pts = pts + pts[:1]
+        x = [ c[0] for c in pts ]
+        y = [ c[1] for c in pts ]
+        sxx = syy = sxy = 0
+        a = area(pts)
+        cx, cy = centroid(pts)
+        for i in range(len(pts) - 1):
+            sxx += (y[i]**2 + y[i]*y[i+1] + y[i+1]**2)*(x[i]*y[i+1] - x[i+1]*y[i])
+            syy += (x[i]**2 + x[i]*x[i+1] + x[i+1]**2)*(x[i]*y[i+1] - x[i+1]*y[i])
+            sxy += (x[i]*y[i+1] + 2*x[i]*y[i] + 2*x[i+1]*y[i+1] + x[i+1]*y[i])*(x[i]*y[i+1] - x[i+1]*y[i])
+        return sxx/12 - a*cy**2, syy/12 - a*cx**2, sxy/24 - a*cx*cy
+    
+    # calculate principal inertia and orientation of principal axis
+    def principal(Ixx, Iyy, Ixy):
+        avg = (Ixx + Iyy)/2
+        diff = (Ixx - Iyy)/2      # signed
+        I1 = avg + sqrt(diff**2 + Ixy**2)
+        I2 = avg - sqrt(diff**2 + Ixy**2)
+        theta = atan2(-Ixy, diff)/2
+        return I1, I2, theta
     
 class SteelBar:
     def __init__(self,area,xg,yg):
